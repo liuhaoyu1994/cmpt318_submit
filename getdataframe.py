@@ -29,25 +29,31 @@ def get_labels(in_dir):
     return output
 
 def fill_likelihood(input_row,data):
+    row_index = data.index[data['datetime']==input_row['datetime']].tolist()
     if input_row['weather'] in weather_list:
-        data.set_value(data.index[data['datetime']==input_row['datetime']],[input_row['weather']],1)
+        data.loc[row_index[0],[input_row['weather']]] = 1
 
 def generate_likelihood(input_row,data):
     ignore = {0,1,data.index.size-1,data.index.size-2}
     row_index = data.index[data['datetime']==input_row['datetime']].tolist()
     if pd.isnull(input_row['weather']) and row_index[0] not in ignore:
+        max_likelihood=0
+        label_re = None
         for i in weather_list:
             value = 0
             for neighbour in {row_index[0]-2,row_index[0]-1,row_index[0]+1,row_index[0]+2}:
                 if pd.notnull(data.loc[neighbour,'weather']):
                     value += data.loc[neighbour,i]*0.5/abs(neighbour-row_index[0])
-            data.set_value(row_index[0],[i],value)
-
-        
+            data.loc[row_index[0],[i]] = value
+            if max_likelihood < value:
+                max_likelihood = value
+                label_re = i    
+        data.loc[row_index[0],['weather_re']]=label_re
 def cleanning_data(data):
     for i in weather_list:
         data[i] = 0
     data.apply(relabel,axis=1,data = data)
+    data['weather_re']=data['weather']
     data.apply(fill_likelihood,axis=1,data = data)
     data.apply(generate_likelihood,axis=1,data = data)
     data = data.drop(data[data.Rain+data.Cloudy+data.Clear+data['Mostly Cloudy']==0].index)
@@ -58,13 +64,13 @@ def relabel(input_row,data):
     if input_row['weather'] in weather_list:
         pass
     elif input_row['weather']=='Mainly Clear':
-        data.set_value(row_index[0],['weather'],'Clear')
+        data.loc[row_index[0],['weather']]='Clear'
     elif input_row['weather'] in rain_list:
-        data.set_value(row_index[0],['weather'],'Rain')
+        data.loc[row_index[0],['weather']]='Rain'
     elif input_row['weather'] in snow_list:
-        data.set_value(row_index[0],['weather'],'Snow')
+        data.loc[row_index[0],['weather']]='Snow'
     else:
-        data.set_value(row_index[0],['weather'],None)
+        data.loc[row_index[0],['weather']]=None
 
 
 # File name to datetime functions:
@@ -124,14 +130,12 @@ def join_df(df1,df2):
 def main():
     in_dir_csv = sys.argv[1]
     in_dir_img = sys.argv[2]
-    global labels,labels_df
     labels = get_labels(in_dir_csv)
     labels_df = cleanning_data(labels)
-    print(labels_df)
     print('Start reading images:')
     images_df = images_to_pd(in_dir_img)
     df = join_df(labels_df,images_df)
-    df.to_csv('sky_nd_nearest_fill.csv')
+    df.to_csv('weather_re.csv')
     
     
 if __name__ == '__main__':
