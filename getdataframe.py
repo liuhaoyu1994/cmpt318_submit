@@ -12,9 +12,13 @@ class MyImage:
 
 	def __str__(self):
 		return self.__name
-#https://stackoverflow.com/questions/44663347/python-opencv-reading-the-image-file-name
+#from https://stackoverflow.com/questions/44663347/python-opencv-reading-the-image-file-name
 
-datetime_re = re.compile(r'-(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)')
+# Csv read/cleaning functions: 
+#==============================================================================
+weather_list = {'Rain','Cloudy','Mostly Cloudy','Clear','Snow'}
+rain_list = {'Rain Showers', 'Moderate Rain', 'Heavy Rain', 'Moderate Rain Showers','Drizzle','Moderate Rain,Drizzle','Rain,Drizzle'}
+snow_list={'Snow Showers', 'Moderate Snow'}
 
 def get_labels(in_dir):
     output = pd.DataFrame()
@@ -25,35 +29,47 @@ def get_labels(in_dir):
     return output
 
 def fill_likelihood(input_row,data):
-    weather_list = {'Rain','Cloudy','Mostly Cloudy','Clear','Snow'}
     if input_row['weather'] in weather_list:
         data.set_value(data.index[data['datetime']==input_row['datetime']],[input_row['weather']],1)
 
+def generate_likelihood(input_row,data):
+    ignore = {0,1,data.index.size-1,data.index.size-2}
+    row_index = data.index[data['datetime']==input_row['datetime']].tolist()
+    if pd.isnull(input_row['weather']) and row_index[0] not in ignore:
+        for i in weather_list:
+            value = 0
+            for neighbour in {row_index[0]-2,row_index[0]-1,row_index[0]+1,row_index[0]+2}:
+                if pd.notnull(data.loc[neighbour,'weather']):
+                    value += data.loc[neighbour,i]*0.5/abs(neighbour-row_index[0])
+            data.set_value(row_index[0],[i],value)
+
+        
 def cleanning_data(data):
-    data['Rain'] = 0
-    data['Cloudy'] = 0
-    data['Mostly Cloudy'] = 0
-    data['Clear'] = 0
-    data['Snow'] = 0
+    for i in weather_list:
+        data[i] = 0
+    data.apply(relabel,axis=1,data = data)
     data.apply(fill_likelihood,axis=1,data = data)
-    data.apply(cleanweather,axis=1,data = data)
-    data = data[pd.notnull(data['weather'])]
+    data.apply(generate_likelihood,axis=1,data = data)
+    data = data.drop(data[data.Rain+data.Cloudy+data.Clear+data['Mostly Cloudy']==0].index)
     return data
 
-def cleanweather(input_row,data):
-    weather_list = {'Rain','Cloudy','Mostly Cloudy','Clear','Snow'}
-    rain_list = {'Rain Showers', 'Moderate Rain', 'Heavy Rain', 'Moderate Rain Showers','Drizzle','Moderate Rain,Drizzle','Rain,Drizzle'}
-    snow_list={'Snow Showers', 'Moderate Snow'}
+def relabel(input_row,data):
+    row_index = data.index[data['datetime']==input_row['datetime']].tolist()
     if input_row['weather'] in weather_list:
         pass
     elif input_row['weather']=='Mainly Clear':
-        data.set_value(data.index[data['datetime']==input_row['datetime']],['weather'],'Clear')
+        data.set_value(row_index[0],['weather'],'Clear')
     elif input_row['weather'] in rain_list:
-        data.set_value(data.index[data['datetime']==input_row['datetime']],['weather'],'Rain')
+        data.set_value(row_index[0],['weather'],'Rain')
     elif input_row['weather'] in snow_list:
-        data.set_value(data.index[data['datetime']==input_row['datetime']],['weather'],'Snow')
+        data.set_value(row_index[0],['weather'],'Snow')
     else:
-        data.set_value(data.index[data['datetime']==input_row['datetime']],['weather'],None)
+        data.set_value(row_index[0],['weather'],None)
+
+
+# File name to datetime functions:
+#==============================================================================
+datetime_re = re.compile(r'-(\d\d\d\d)(\d\d)(\d\d)(\d\d)(\d\d)')
         
 def get_datetime(txt):
     match = datetime_re.search(txt)
@@ -67,6 +83,9 @@ def path_to_time(filename):
     datetime = get_datetime(filename)
     return datetime
 
+
+# Image read/cleaning functions: 
+#==============================================================================
 def is_dark(b,g,r):
     r = r.flatten()
     g = g.flatten()
@@ -83,7 +102,7 @@ def images_to_pd(in_dir):
         image = MyImage(filename)
         print('working on '+str(count)+'/6991.')
         image2 = image.img[:][0:120]
-        BGR = cv2.resize(image2,(30,20),interpolation=cv2.INTER_CUBIC)
+        BGR = cv2.resize(image2,(30,20),interpolation=cv2.INTER_NEAREST)
         b,g,r = cv2.split(BGR)
         if(is_dark(b,g,r)):
             pass
@@ -96,6 +115,7 @@ def images_to_pd(in_dir):
             temp = pd.DataFrame(data=list(d)).T
             output = output.append(temp,ignore_index= True)
     return output
+#==============================================================================
 
 def join_df(df1,df2):
     df = df2.set_index([0]).join(df1.set_index('datetime'),how = 'inner')
@@ -103,15 +123,15 @@ def join_df(df1,df2):
 
 def main():
     in_dir_csv = sys.argv[1]
-    #in_dir_img = sys.argv[2]
+    in_dir_img = sys.argv[2]
     global labels,labels_df
     labels = get_labels(in_dir_csv)
     labels_df = cleanning_data(labels)
     print(labels_df)
-    #print('Start reading images:')
-    #image_df = images_to_pd(in_dir_img)
-    #df = join_df(df1,df2)
-    #df.to_csv('sky_no_dark_cubic.csv')
+    print('Start reading images:')
+    images_df = images_to_pd(in_dir_img)
+    df = join_df(labels_df,images_df)
+    df.to_csv('sky_nd_nearest_fill.csv')
     
     
 if __name__ == '__main__':
