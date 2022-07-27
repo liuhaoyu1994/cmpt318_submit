@@ -1,5 +1,14 @@
 # cmpt318_submit
 
+A  model to predict the weather condition in Vancouver based on Kat Kam image from Downtown Vancouver
+
+## Overview
+
+The study on Big Data in Image Recognition and Weather Prediction is to help to release of the labour force and improve the efficiency of labelling weather. Our purpose is to find out the best model to predict the weather condition in Vancouver based on Kat Kam's image from
+Downtown Vancouver. Weather data are retrieved from YVR airport weather station and images are taken by webcam in Downtown Vancouver. After applying data cleaning, statistical analysis and image processing techniques, we finally find out a satisfiable model which can be trained to predict weather
+
+## Installation 
+
 There are three codes show our work: get_dataframe.py, build_model.py, project_analyzation.ipynb.
 get_dataframe.py generates a dataframe contains features of images and corresponding weather labels.
 build_model.py reads the generated dataframe, builds and trains a model, returns score of the model.
@@ -12,7 +21,7 @@ Put project_analyzation.ipynb and image_labeled.csv under the same directory in 
 
 2. Order of execution: execute get_dataframe.py, then execute build_model.py
 
-Important!!!!!!!!!!!: execution of get_dataframe.py may take about 2 hours to finish.
+Important!!!!!!!!!!!: **Execution of get_dataframe.py may take about 2 hours to finish.**
 		      We have provided the output dataframe under the given folder named 'image_labeled.csv'.
 		      Please just execute build_model.py with provided dataframe to save your time.
 		      Execution of build_model.py takes about 3 and a half minutes, please be patient on execution.		      	
